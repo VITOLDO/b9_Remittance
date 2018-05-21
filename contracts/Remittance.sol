@@ -11,9 +11,9 @@ contract Remittance {
 	mapping(bytes32=>address) public hash;
 	mapping(address=>uint) public etherBalance;
 
-	event LogEtherForExchangeComesIn(uint ammount, address owner, bytes32 puzzle);
-	event LogEtherForExchangeComesOut(uint ammount, address owner, bytes32 puzzle, uint converted);
-	event LogWithdrawal(address whom, uint ammount);
+	event LogEtherForExchangeComesIn(uint ammount, address indexed owner, bytes32 puzzle);
+	event LogEtherForExchangeComesOut(uint ammount, address indexed owner, bytes32 puzzle, uint converted);
+	event LogWithdrawal(address indexed whom, uint ammount);
 	event LogRemittanceShutDown(uint block);
 
 	function Remittance(uint remittanceDeadline) public {
@@ -23,8 +23,7 @@ contract Remittance {
 		enabled = true;
 	}
 
-	function sendEther(uint puzzle1, 
-					   uint puzzle2) 
+	function sendEther(bytes32 puzzle) 
 		public 
 		payable 
 		returns(bool) 
@@ -33,8 +32,8 @@ contract Remittance {
 		require(msg.value > 0);
 
 		etherBalance[msg.sender] = msg.value;
-		hash[keccak256(puzzle1, puzzle2)] = msg.sender;
-		LogEtherForExchangeComesIn(msg.value, msg.sender, keccak256(puzzle1, puzzle2));
+		hash[puzzle] = msg.sender;
+		LogEtherForExchangeComesIn(msg.value, msg.sender, puzzle);
 
 		return true;
 	}

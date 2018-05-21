@@ -1,5 +1,8 @@
 var Remittance = artifacts.require("./Remittance.sol");
 
+const PromisifyWeb3 = require("../utils/promisifyWeb3.js");
+PromisifyWeb3.promisify(web3);
+
 contract('Remittance', function(accounts) {
   
   var contract;
@@ -21,22 +24,23 @@ contract('Remittance', function(accounts) {
   });
 
   it("should be possible to send some ether", function() {
-    var hashForAddress = 0;
-    return contract.sendEther(123, 456, {from: owner, value: web3.toWei(1, 'ether')})
-    .then(function(txReceipt) {
-      return contract.getKeccak256(123, 456, {from: owner});
+    var puzzle = 0;
+    return contract.getKeccak256.call(123, 456)
+    .then(function(puzzled123456) {
+      puzzle = puzzled123456;
+      console.log(puzzle);
+      return contract.sendEther(puzzle, {from: owner, value: web3.toWei(1, 'ether')});
     })
-    .then(function(hash) {
-       hashForAddress = hash;
+    .then(function(txReceipt) {
       return contract.etherBalance(owner, {from: owner});
     })
     .then(function(balance) {
       assert.equal(balance, web3.toWei(1, 'ether'), "Ether balance is not correct or is in incorrect place");
-      return contract.hash(hashForAddress, {from: owner});
+      return contract.hash(puzzle, {from: owner});
     })
     .then(function(address) {
       assert.equal(owner, address, "Hash storage returned invalid address");
-      return contract.balance({from:owner});
+      return web3.eth.getBalancePromise(contract.address);
     })
     .then(function(balance){
       assert.equal(web3.toWei(1, 'ether'), balance, "Contract balance is invalid");
