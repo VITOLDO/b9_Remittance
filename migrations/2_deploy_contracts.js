@@ -4,5 +4,5 @@ var Remittance = artifacts.require("./Remittance.sol");
 module.exports = function(deployer) {
   deployer.deploy(ConvertLib);
   deployer.link(ConvertLib, Remittance);
-  deployer.deploy(Remittance, 20);
+  deployer.deploy(Remittance);
 };
