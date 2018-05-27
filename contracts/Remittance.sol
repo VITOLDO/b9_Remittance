@@ -1,70 +1,67 @@
 pragma solidity ^0.4.17;
 
-contract Remittance {
-	
-	address public owner;
-	bool public enabled;
+import './Stoppable.sol';
 
+contract Remittance is Stoppable {
+	
 	struct RemittanceStruct {
-	  address owner;
+	  address sender;
 	  uint amount;
 	  uint deadline;
 	}
 
-	mapping(bytes32=>RemittanceStruct) public hash;
+	mapping(bytes32=>RemittanceStruct) public remittanceStruct;
 
-	event LogEtherForExchangeComesIn(uint ammount, address indexed owner, bytes32 puzzle);
-	event LogEtherForExchangeComesOut(uint ammount, address indexed caller, bytes32 puzzle);
-	event LogWithdrawal(address indexed whom, uint ammount);
-	event LogRemittanceShutDown(uint block);
+	event LogEtherForExchangeComesIn(address indexed sender,     uint ammount, bytes32 password);
+	event LogEtherForExchangeComesOut(address indexed recipient, uint ammount, bytes32 password);
+	event LogWithdrawal(address indexed whom, 				     uint ammount);
 
 	function Remittance() public {
-		owner = msg.sender;
-		enabled = true;
 	}
 
-	function sendEther(bytes32 puzzle, uint deadline) 
+	function sendRemittance(bytes32 password, uint deadline) 
 		public 
 		payable 
+		onlyWhenEnabled
 		returns(bool) 
 	{
-		require(isEnabled());
 		require(msg.value > 0);
-		require(hash[puzzle].owner == 0);
+		require(remittanceStruct[password].sender == 0);
 
-		hash[puzzle] = RemittanceStruct(msg.sender, msg.value, block.number + deadline);
-		LogEtherForExchangeComesIn(msg.value, msg.sender, puzzle);
+		remittanceStruct[password] = RemittanceStruct(msg.sender, msg.value, block.number + deadline);
+		LogEtherForExchangeComesIn(msg.sender, msg.value, password);
 
 		return true;
 	}
 
-	function claimFunds(uint puzzle1,
-						uint puzzle2) 
+	function claimRemittance(string puzzle) 
 		public 
+		onlyWhenEnabled
 		returns(bool) 
 	{
-		require(isEnabled());
-		RemittanceStruct storage puzzledDeposit = hash[getKeccak256(puzzle1, puzzle2, msg.sender)];
+		RemittanceStruct storage puzzledDeposit = remittanceStruct[hashHelper(puzzle, msg.sender)];
 		require(puzzledDeposit.amount > 0);
 		require(block.number <= puzzledDeposit.deadline);
 		
 		//avoid reentrance	
 		var amountToSend = puzzledDeposit.amount;
 		puzzledDeposit.amount = 0;
-		LogEtherForExchangeComesOut(amountToSend, msg.sender, getKeccak256(puzzle1, puzzle2, msg.sender));
+		LogEtherForExchangeComesOut(msg.sender, amountToSend, hashHelper(puzzle, msg.sender));
 		msg.sender.transfer(amountToSend);
 
 		return true;
 	}
 
-	function withdrawMyFunds(bytes32 puzzle) public returns(bool) {
-		require(!isEnabled());
-
-		RemittanceStruct storage puzzledDeposit = hash[puzzle];
+	function withdrawBackRemittance(bytes32 password) 
+		public 
+		onlyWhenDisabled
+		returns(bool) 
+	{
+		RemittanceStruct storage puzzledDeposit = remittanceStruct[password];
 
 		require(puzzledDeposit.amount > 0);
 		require(block.number > puzzledDeposit.deadline);
-		require(puzzledDeposit.owner == msg.sender);
+		require(puzzledDeposit.sender == msg.sender);
 		
 		// avoid reentrance
 		var amountToSend = puzzledDeposit.amount;
@@ -76,19 +73,7 @@ contract Remittance {
 		return true;
 	}
 
-	function killSwitch() public returns(bool) {
-		if (msg.sender == owner) enabled = false;
-
-		LogRemittanceShutDown(block.number);
-
-		return true;
-	}
-
-	function isEnabled() public constant returns(bool) {
-		return (enabled);
-	}
-
-	function getKeccak256(uint p1, uint p2, address p3) public pure returns(bytes32) {
-		return keccak256(p1, p2, p3);
+	function hashHelper(string password, address processor) public pure returns(bytes32) {
+		return keccak256(password, processor);
 	}
 }

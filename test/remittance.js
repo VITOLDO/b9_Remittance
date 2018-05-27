@@ -60,7 +60,7 @@ contract('Remittance', function(accounts) {
   });
 
   it("should be active by default", function() {
-    return contract.isEnabled()
+    return contract.enabled()
     .then(function(isEnabled) {
       assert.isTrue(isEnabled, "Contract is not enabled by default.");
     });
@@ -71,11 +71,11 @@ contract('Remittance', function(accounts) {
     var blockNumber;
     var recipientBalance;
     var gasUsed;
-    return contract.getKeccak256(123, 456, recipient)
+    return contract.hashHelper("123456", recipient)
     .then(function(puzzled123456) {
       puzzle = puzzled123456;
       blockNumber = web3.eth.blockNumber + 1;
-      return contract.sendEther(puzzle, 20, {from: owner, value: web3.toWei(1, 'ether')});
+      return contract.sendRemittance(puzzle, 20, {from: owner, value: web3.toWei(1, 'ether')});
     })
     .then(function(txReceipt) {
       return getEventsPromise(contract.LogEtherForExchangeComesIn({}, 
@@ -84,11 +84,11 @@ contract('Remittance', function(accounts) {
     .then(function(events) {
       var eventArgs = events[0];
       assert.equal(eventArgs.args.ammount, web3.toWei(1, 'ether'), "IN Event logged ammount incorrectly");
-      assert.equal(eventArgs.args.owner, owner, "IN Event logged owner incorrectly");
-      return contract.hash(puzzle);
+      assert.equal(eventArgs.args.sender,  owner,                  "IN Event logged owner incorrectly");
+      return contract.remittanceStruct(puzzle);
     })
     .then(function(remittanceStruct){
-      assert.equal(owner, remittanceStruct[0], "Hash storage returned invalid address for owner");
+      assert.equal(owner,                  remittanceStruct[0], "Hash storage returned invalid address for owner");
       assert.equal(web3.toWei(1, 'ether'), remittanceStruct[1], "Ether balance is not correct or is in incorrect place");
       return web3.eth.getBalancePromise(contract.address);
     })
@@ -99,7 +99,7 @@ contract('Remittance', function(accounts) {
     })
     .then(function(balance){
       recipientBalance = balance;
-      return contract.claimFunds(123, 456, {from: recipient});
+      return contract.claimRemittance("123456", {from: recipient});
     }).then(function(txReceipt){
       gasUsed = txReceipt.receipt.gasUsed;
       return getEventsPromise(contract.LogEtherForExchangeComesOut({}, 
@@ -107,9 +107,9 @@ contract('Remittance', function(accounts) {
     })
     .then(function(events) {
       var eventArgs = events[0];
-      assert.equal(eventArgs.args.ammount, web3.toWei(1, 'ether'), "OUT Event logged ammount incorrectly");
-      assert.equal(eventArgs.args.caller, recipient, "OUT Event logged owner incorrectly");
-      return contract.hash(puzzle, {from: owner});
+      assert.equal(eventArgs.args.ammount,   web3.toWei(1, 'ether'), "OUT Event logged ammount incorrectly");
+      assert.equal(eventArgs.args.recipient, recipient,              "OUT Event logged owner incorrectly");
+      return contract.remittanceStruct(puzzle, {from: owner});
     })
     .then(function(remittanceStruct) {
       assert.equal(remittanceStruct[1], 0, "Puzzled hash was not marked as received");
